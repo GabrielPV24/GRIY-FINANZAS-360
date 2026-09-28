@@ -2,296 +2,210 @@ import time
 import requests
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 
-st.set_page_config(page_title="GRIY | Reto Petrolero", page_icon="🛢️", layout="wide")
+st.set_page_config(page_title="GRIY | Aventura Petrolera", page_icon="🎮", layout="wide")
 
 SUPABASE_URL = "https://xhizwsiitcvjnafmpplf.supabase.co"
 SUPABASE_KEY = "sb_publishable_yLYAPUcEBf5X2ZV6BEfy0w_NPzf58zx"
-HEADERS = {
-    "apikey": SUPABASE_KEY,
-    "Authorization": f"Bearer {SUPABASE_KEY}",
-    "Content-Type": "application/json",
+HEADERS = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}", "Content-Type": "application/json"}
+
+# Cada misión mantiene conceptos financieros reales, pero con lenguaje sencillo.
+MISSIONS = {
+1:{"emoji":"🧰","title":"¡La planta despierta!","color":"#ff9f1c","bg":"linear-gradient(135deg,#ff9f1c,#ff4d6d)","scene":"Necesitamos filtros, lubricantes y sellos para arrancar.","ask":"¿Qué compras?","tip":"Gastar en cosas del día a día es OPEX.","opts":[("🟢 Solo lo necesario","Ahorras dinero, pero trabajas más lento.",(1200000,0,0,0,0)),("🔵 Todo el paquete","Gastas más y la planta puede trabajar mejor.",(2500000,0,0,0,0)),("🟣 Paquete grande con crédito","Tienes más insumos, pero aparece deuda.",(3200000,0,0,0,1500000))]},
+2:{"emoji":"🔧","title":"¡La bomba tiembla!","color":"#00b4d8","bg":"linear-gradient(135deg,#00b4d8,#4361ee)","scene":"Una bomba importante está vibrando raro.","ask":"¿Qué haces?","tip":"Mantenimiento preventivo puede evitar problemas mayores.","opts":[("🛠️ Repararla ahora","Pagas mantenimiento y reduces riesgo.",(1500000,0,800000,0,0)),("🏃 Seguir trabajando","Produces hoy, pero tomas más riesgo.",(2100000,0,0,0,0)),("⚙️ Renovar el equipo","Gastás más, pero mejoras tus activos.",(1000000,1500000,800000,0,0))]},
+3:{"emoji":"🏭","title":"¡Máquina nueva!","color":"#9b5de5","bg":"linear-gradient(135deg,#9b5de5,#5a189a)","scene":"Te ofrecen una máquina moderna para mejorar la planta.","ask":"¿La compras?","tip":"Comprar equipo que dura años es CAPEX.","opts":[("💵 Sí, con efectivo","Baja tu caja, sube tu activo fijo.",(1400000,3500000,0,0,0)),("🏦 Sí, con financiamiento","Conservas caja, pero sube la deuda.",(1800000,2000000,0,0,2500000)),("🙅 No por ahora","Proteges efectivo, pero no mejoras capacidad.",(2000000,0,0,0,0))]},
+4:{"emoji":"📈","title":"¡Todo subió de precio!","color":"#ff595e","bg":"linear-gradient(135deg,#ff595e,#ff924c)","scene":"Los proveedores subieron los precios de los insumos.","ask":"¿Cómo reaccionas?","tip":"Más producción también puede significar más costo.","opts":[("🔥 Seguir a toda máquina","Mantienes ventas, pero gastas mucho.",(3500000,0,0,0,0)),("🐢 Bajar el ritmo","Proteges dinero y produces menos.",(1500000,0,0,0,0)),("💳 Comprar con crédito","Mantienes insumos y aumenta la deuda.",(3000000,0,0,0,2000000))]},
+5:{"emoji":"🏦","title":"¡El banco llama!","color":"#4361ee","bg":"linear-gradient(135deg,#4361ee,#00b4d8)","scene":"El banco te ofrece dinero prestado para crecer.","ask":"¿Cuánto pides?","tip":"Un préstamo ayuda hoy, pero genera deuda e intereses.","opts":[("🚀 Crédito grande","Mucho efectivo, mucha deuda.",(3000000,0,0,0,5000000)),("⚖️ Crédito moderado","Buscas equilibrio.",(2200000,0,0,0,2000000)),("✋ Nada","No aumenta la deuda, pero tienes menos recursos.",(1500000,0,0,0,0))]},
+6:{"emoji":"👷","title":"¡Entrenamiento del equipo!","color":"#2ec4b6","bg":"linear-gradient(135deg,#2ec4b6,#06d6a0)","scene":"Tu personal puede aprender mejores formas de trabajar.","ask":"¿Cuánto inviertes en capacitación?","tip":"Capacitar cuesta hoy, pero fortalece la operación y el control.","opts":[("🎓 Curso intensivo","Más gasto y más prevención.",(1400000,0,1500000,0,0)),("📘 Curso corto","Gasto moderado.",(1800000,0,600000,0,0)),("⏭️ Lo dejamos para después","Ahorras hoy, sin reforzar controles.",(2100000,0,0,0,0))]},
+7:{"emoji":"⏸️","title":"¡Paro de planta!","color":"#6c757d","bg":"linear-gradient(135deg,#6c757d,#ffb703)","scene":"Ingeniería quiere parar un rato para revisar equipos.","ask":"¿Qué eliges?","tip":"Parar reduce producción, pero puede bajar riesgos.","opts":[("🛑 Paro preventivo","Menos producción, más mantenimiento.",(700000,0,1500000,0,0)),("▶️ Seguir normal","Más producción, menos prevención.",(2600000,0,0,0,0)),("🔩 Cambiar una pieza clave","Inviertes en equipo y mantenimiento.",(1100000,2000000,500000,0,0))]},
+8:{"emoji":"🚨","title":"¡Alerta de huachicol!","color":"#d90429","bg":"linear-gradient(135deg,#d90429,#6a040f)","scene":"Hay riesgo de robo de hidrocarburos.","ask":"¿Cómo proteges la empresa?","tip":"En este juego, más controles reducen el impacto del robo.","opts":[("🛡️ Blindaje fuerte","Gastás más en vigilancia y control.",(1500000,0,2500000,0,0)),("👀 Refuerzo moderado","Protección intermedia.",(1800000,0,1200000,0,0)),("💸 No gastar en seguridad","Conservas caja, pero tomas más riesgo.",(2200000,0,0,0,0))]},
+9:{"emoji":"⛽","title":"¡Todos quieren combustible!","color":"#00bbf9","bg":"linear-gradient(135deg,#00bbf9,#3a86ff)","scene":"La demanda sube y puedes vender mucho más.","ask":"¿Cuánto produces?","tip":"Vender más puede dar ingresos, pero exige dinero para operar.","opts":[("🚀 Producción máxima","Apuestas fuerte por ventas.",(5000000,0,0,0,0)),("⚖️ Producción media","Crecimiento con prudencia.",(3300000,0,0,0,0)),("🐢 Producción baja","Proteges efectivo.",(1600000,0,0,0,0))]},
+10:{"emoji":"🚚","title":"¡Los camiones no llegan!","color":"#fb8500","bg":"linear-gradient(135deg,#fb8500,#ffb703)","scene":"Un problema de transporte amenaza las entregas.","ask":"¿Cómo lo arreglas?","tip":"La logística también cuesta dinero.","opts":[("🚚 Transporte de emergencia","Caro, pero mantienes entregas.",(2500000,0,800000,0,0)),("🗺️ Reorganizar rutas","Costo moderado.",(2000000,0,300000,0,0)),("⌛ Aceptar retrasos","Ahorras, pero vendes menos.",(1000000,0,0,0,0))]},
+11:{"emoji":"🏗️","title":"¡Proyecto nuevo!","color":"#06d6a0","bg":"linear-gradient(135deg,#06d6a0,#ffd166)","scene":"Puedes mejorar infraestructura de la empresa.","ask":"¿Cómo pagas el proyecto?","tip":"Infraestructura nueva suele ser CAPEX.","opts":[("💵 Con dinero propio","Baja efectivo, suben activos.",(1500000,3500000,0,0,0)),("🏦 Con financiamiento","Haces el proyecto y sube la deuda.",(1800000,3500000,0,0,2500000)),("🙅 No hacerlo","Conservas efectivo.",(2300000,0,0,0,0))]},
+12:{"emoji":"💰","title":"¡Hay dinero en caja!","color":"#f15bb5","bg":"linear-gradient(135deg,#f15bb5,#9b5de5)","scene":"Tienes que decidir qué hacer con los recursos disponibles.","ask":"¿A dónde va el dinero?","tip":"No siempre gastar más es mejor.","opts":[("💳 Pagar deuda","Bajan tus obligaciones.",(1500000,0,0,3000000,0)),("🏭 Reinvertir","Compras activos para el futuro.",(1600000,3000000,0,0,0)),("🐷 Guardar efectivo","Aumentas tu colchón de dinero.",(1000000,0,0,0,0))]},
+13:{"emoji":"🔍","title":"¡Algo no cuadra!","color":"#577590","bg":"linear-gradient(135deg,#577590,#00b4d8)","scene":"El inventario físico no coincide con los registros.","ask":"¿Qué revisión haces?","tip":"Los controles internos ayudan a detectar pérdidas.","opts":[("🕵️ Auditoría completa","Más costo y más control.",(1200000,0,2000000,0,0)),("🎯 Revisar solo áreas críticas","Costo moderado.",(1800000,0,800000,0,0)),("🙈 No revisar todavía","Ahorras hoy, asumes más riesgo.",(2200000,0,0,0,0))]},
+14:{"emoji":"🤝","title":"¡Contrato gigante!","color":"#3a86ff","bg":"linear-gradient(135deg,#3a86ff,#06d6a0)","scene":"Un cliente quiere comprar una gran cantidad de producto.","ask":"¿Aceptas el trato?","tip":"Más ventas pueden exigir más efectivo y capacidad.","opts":[("🏆 Aceptar todo","Apuesta grande y apoyo financiero.",(5500000,0,0,0,1500000)),("👍 Aceptar una parte","Crecimiento moderado.",(3500000,0,0,0,0)),("✋ Rechazarlo","Proteges recursos.",(1400000,0,0,0,0))]},
+15:{"emoji":"🏁","title":"¡Gran final!","color":"#38b000","bg":"linear-gradient(135deg,#38b000,#ffd60a)","scene":"Es tu última decisión. ¡Hay que cerrar bien la empresa!","ask":"¿Cuál es tu jugada final?","tip":"El ganador equilibra ganancia, efectivo, deuda, activos y control.","opts":[("🔥 Vender a lo grande","Buscas máxima actividad.",(5800000,0,0,0,0)),("⚖️ Cierre equilibrado","Vendes, pagas deuda y refuerzas control.",(3800000,0,500000,1500000,0)),("🧹 Limpiar deudas","Produces menos y reduces obligaciones.",(2000000,0,0,3000000,0))]}
 }
 
-ROUNDS = {
-    1: {"emoji":"🧰","title":"Arranque de la planta","tag":"CONSUMIBLES","bg":"linear-gradient(135deg,#f59e0b 0%,#ef4444 48%,#7c2d12 100%)","colors":("#f59e0b","#ef4444"),"scenario":"La planta comienza el periodo y necesita lubricantes, filtros, sellos y otros consumibles para operar.","question":"¿Cómo vas a abastecer los consumibles?","options":[
-        {"title":"Comprar solo lo indispensable","desc":"Operas con cautela y conservas más efectivo.","concept":"OPEX y control de efectivo","payload":(1200000,0,0,0,0),"result":"Elegiste una operación austera: cuidaste caja, pero limitaste la actividad de la planta."},
-        {"title":"Comprar inventario completo","desc":"Gastas más ahora para operar con mayor intensidad.","concept":"OPEX y costo de operación","payload":(2500000,0,0,0,0),"result":"Aseguraste insumos suficientes para operar fuerte; sacrificaste efectivo a cambio de mayor actividad."},
-        {"title":"Comprar más y financiar parte","desc":"Aseguras inventario sin usar todo tu efectivo, pero aumenta la deuda.","concept":"OPEX + financiamiento","payload":(3200000,0,0,0,1500000),"result":"Protegiste la operación usando financiamiento: ganaste margen de maniobra, pero asumiste nueva deuda."},]},
-    2: {"emoji":"🔧","title":"Una bomba empieza a vibrar","tag":"MANTENIMIENTO","bg":"linear-gradient(135deg,#38bdf8 0%,#2563eb 52%,#172554 100%)","colors":("#38bdf8","#2563eb"),"scenario":"Mantenimiento detecta vibración anormal en una bomba importante. Todavía funciona, pero puede empeorar.","question":"¿Qué haces con la bomba?","options":[
-        {"title":"Mantenimiento preventivo ahora","desc":"Bajas un poco la operación y gastas en prevención.","concept":"OPEX preventivo","payload":(1500000,0,800000,0,0),"result":"Atendiste la bomba antes de una falla mayor. Tuviste un gasto preventivo y una operación más controlada."},
-        {"title":"Seguir operando y posponer","desc":"Produces más hoy, pero no fortaleces prevención.","concept":"Riesgo operativo","payload":(2100000,0,0,0,0),"result":"Priorizaste producción inmediata. Conservaste recursos de mantenimiento, pero asumiste más riesgo operativo."},
-        {"title":"Reacondicionar el conjunto completo","desc":"Haces una intervención mayor y mejoras activos.","concept":"CAPEX + mantenimiento","payload":(1000000,1500000,800000,0,0),"result":"Hiciste una intervención profunda: gastaste más hoy, pero fortaleciste la capacidad física de la empresa."},]},
-    3: {"emoji":"🏭","title":"Oferta de una máquina nueva","tag":"INVERSIÓN","bg":"linear-gradient(135deg,#a855f7 0%,#7c3aed 46%,#312e81 100%)","colors":("#a855f7","#7c3aed"),"scenario":"Un proveedor ofrece equipo nuevo que puede modernizar parte de la planta y elevar la eficiencia futura.","question":"¿Qué haces con la inversión?","options":[
-        {"title":"Comprar con efectivo","desc":"Desembolsas mucho hoy y aumentas tus activos.","concept":"CAPEX","payload":(1400000,3500000,0,0,0),"result":"Compraste la máquina con recursos propios. Bajó tu efectivo, pero aumentó tu activo fijo y tu capacidad futura."},
-        {"title":"Comprar con apoyo de financiamiento","desc":"Modernizas sin vaciar la caja, pero tomas deuda.","concept":"CAPEX + deuda","payload":(1800000,2000000,0,0,2500000),"result":"Modernizaste usando deuda: preservaste más efectivo, pero ahora cargas un compromiso financiero adicional."},
-        {"title":"No comprar y seguir con el equipo actual","desc":"Conservas efectivo y priorizas la operación presente.","concept":"Liquidez vs inversión","payload":(2000000,0,0,0,0),"result":"No invertiste en equipo nuevo. Protegiste tu caja, pero renunciaste a mejorar capacidad productiva en esta ronda."},]},
-    4: {"emoji":"📈","title":"Suben los precios de insumos","tag":"COSTOS","bg":"linear-gradient(135deg,#fb7185 0%,#f97316 50%,#9a3412 100%)","colors":("#fb7185","#f97316"),"scenario":"Los proveedores anuncian un aumento de precios. Mantener el mismo nivel de producción será más exigente para la caja.","question":"¿Cómo respondes al aumento de costos?","options":[
-        {"title":"Mantener producción alta","desc":"Aceptas un uso fuerte de efectivo para sostener ventas.","concept":"Costo variable","payload":(3500000,0,0,0,0),"result":"Defendiste el volumen de operación pese a los costos. Moviste más dinero y apostaste por sostener ingresos."},
-        {"title":"Reducir producción temporalmente","desc":"Proteges liquidez y operas de forma moderada.","concept":"Liquidez","payload":(1500000,0,0,0,0),"result":"Bajaste el ritmo para proteger efectivo. Tu exposición al costo fue menor, pero también tu actividad comercial."},
-        {"title":"Comprar fuerte usando crédito","desc":"Aseguras insumos y pides apoyo financiero.","concept":"Inventario + financiamiento","payload":(3000000,0,0,0,2000000),"result":"Cubres la necesidad de insumos con financiamiento. Mantienes operación, pero incrementas obligaciones futuras."},]},
-    5: {"emoji":"🏦","title":"El banco ofrece crédito","tag":"FINANCIAMIENTO","bg":"linear-gradient(135deg,#4f46e5 0%,#0ea5e9 52%,#164e63 100%)","colors":("#4f46e5","#0ea5e9"),"scenario":"El banco ofrece una línea de crédito. Puede darte flexibilidad, pero cada peso prestado aumenta deuda e intereses.","question":"¿Cuánto financiamiento tomas?","options":[
-        {"title":"Tomar un crédito grande","desc":"Tienes mucha caja para operar, con mayor deuda.","concept":"Deuda y gasto financiero","payload":(3000000,0,0,0,5000000),"result":"Tomaste un crédito grande. Ganaste capacidad inmediata de gasto, pero aumentaron deuda e intereses."},
-        {"title":"Tomar un crédito moderado","desc":"Buscas equilibrio entre efectivo y deuda.","concept":"Estructura financiera","payload":(2200000,0,0,0,2000000),"result":"Elegiste financiamiento moderado. Mejoraste caja sin llevar la deuda al nivel de la opción agresiva."},
-        {"title":"No pedir crédito","desc":"Operas únicamente con recursos disponibles.","concept":"Autofinanciamiento","payload":(1500000,0,0,0,0),"result":"Rechazaste el préstamo. Evitaste nueva deuda, pero tu capacidad de expansión inmediata fue menor."},]},
-    6: {"emoji":"👷","title":"Capacitación del personal","tag":"PERSONAL","bg":"linear-gradient(135deg,#22c55e 0%,#14b8a6 52%,#115e59 100%)","colors":("#22c55e","#14b8a6"),"scenario":"Se detectan oportunidades de mejora en procedimientos operativos. Puedes invertir en capacitación o mantener el esquema actual.","question":"¿Qué nivel de capacitación autorizas?","options":[
-        {"title":"Programa intensivo","desc":"Mayor gasto hoy para fortalecer prevención y operación.","concept":"OPEX y prevención","payload":(1400000,0,1500000,0,0),"result":"Hiciste una capacitación intensiva. Aumentó el gasto del periodo, pero fortaleciste prevención y control acumulados."},
-        {"title":"Capacitación corta","desc":"Gasto moderado y menor interrupción de la operación.","concept":"OPEX","payload":(1800000,0,600000,0,0),"result":"Elegiste una capacitación breve: mantuviste más actividad con una inversión moderada en prevención."},
-        {"title":"No capacitar este periodo","desc":"No gastas en formación y mantienes producción.","concept":"Ahorro de corto plazo","payload":(2100000,0,0,0,0),"result":"Evitaste el gasto de capacitación. Conservaste recursos hoy, pero no fortaleciste los controles de la empresa."},]},
-    7: {"emoji":"⏸️","title":"¿Parar la planta para mantenimiento?","tag":"PARO PROGRAMADO","bg":"linear-gradient(135deg,#64748b 0%,#334155 48%,#f59e0b 100%)","colors":("#64748b","#f59e0b"),"scenario":"Ingeniería propone un paro parcial para revisar equipos críticos. Parar cuesta producción; no parar mantiene ventas pero deja el riesgo.","question":"¿Cuál es tu estrategia?","options":[
-        {"title":"Paro parcial preventivo","desc":"Reduces operación y gastas en mantenimiento.","concept":"Costo de oportunidad + OPEX","payload":(700000,0,1500000,0,0),"result":"Aceptaste un paro preventivo. Perdiste actividad inmediata, pero invertiste en reducir riesgo operacional."},
-        {"title":"Seguir operando normalmente","desc":"No haces paro y priorizas producción.","concept":"Riesgo vs ingreso","payload":(2600000,0,0,0,0),"result":"Mantienes la planta trabajando. Generas más actividad hoy, pero sin el colchón preventivo de un paro programado."},
-        {"title":"Cambiar un componente crítico","desc":"Haces una parada corta y conviertes parte del gasto en activo.","concept":"CAPEX + mantenimiento","payload":(1100000,2000000,500000,0,0),"result":"Aprovechaste la intervención para renovar un componente. Fue costoso, pero aumentó tu activo fijo."},]},
-    8: {"emoji":"🚨","title":"Alerta de huachicol","tag":"RIESGO ILÍCITO","bg":"linear-gradient(135deg,#dc2626 0%,#991b1b 50%,#450a0a 100%)","colors":("#dc2626","#7f1d1d"),"scenario":"Se detectan indicios de posible robo de hidrocarburos. En este juego, la inversión previa y actual en controles reduce el impacto del evento.","question":"¿Cómo proteges la operación?","options":[
-        {"title":"Blindaje fuerte de vigilancia y monitoreo","desc":"Realizas un gasto importante en controles.","concept":"Control interno + OPEX","payload":(1500000,0,2500000,0,0),"result":"Reforzaste fuertemente controles. Tu gasto subió, pero llegaste mejor protegido al evento de huachicol."},
-        {"title":"Refuerzo moderado","desc":"Buscas equilibrio entre costo y protección.","concept":"Gestión de riesgos","payload":(1800000,0,1200000,0,0),"result":"Aplicaste un refuerzo moderado. No gastaste tanto como en el blindaje total, pero redujiste parte de la exposición."},
-        {"title":"No agregar controles","desc":"Conservas efectivo y asumes el riesgo del evento.","concept":"Riesgo financiero","payload":(2200000,0,0,0,0),"result":"Decidiste no gastar más en controles. Tu operación siguió con fuerza, pero quedaste más expuesto a la pérdida por huachicol."},]},
-    9: {"emoji":"⛽","title":"Demanda alta de combustible","tag":"VENTAS","bg":"linear-gradient(135deg,#06b6d4 0%,#0284c7 50%,#1d4ed8 100%)","colors":("#06b6d4","#2563eb"),"scenario":"La demanda local aumenta. Hay oportunidad de vender más, pero producir más también exige más capital de trabajo.","question":"¿Qué nivel de producción eliges?","options":[
-        {"title":"Aprovechar al máximo la demanda","desc":"Producción alta y uso fuerte de recursos.","concept":"Ingresos y capital de trabajo","payload":(5000000,0,0,0,0),"result":"Fuiste agresivo en ventas. Moviste mucho efectivo y aprovechaste el mercado al máximo."},
-        {"title":"Aumentar producción con prudencia","desc":"Subes ventas sin llevar la operación al máximo.","concept":"Margen y liquidez","payload":(3300000,0,0,0,0),"result":"Aprovechaste la demanda de forma moderada. Buscaste crecimiento sin tensionar tanto la caja."},
-        {"title":"Mantener una producción conservadora","desc":"Proteges efectivo aunque dejas ventas sobre la mesa.","concept":"Liquidez","payload":(1600000,0,0,0,0),"result":"Conservaste liquidez. La empresa quedó más cómoda de caja, pero no capturó toda la oportunidad de mercado."},]},
-    10: {"emoji":"🚚","title":"Problema de logística","tag":"DISTRIBUCIÓN","bg":"linear-gradient(135deg,#f97316 0%,#eab308 52%,#854d0e 100%)","colors":("#f97316","#eab308"),"scenario":"Un problema de transporte amenaza entregas. Debes decidir entre pagar una solución rápida, reorganizar o aceptar retrasos.","question":"¿Cómo resuelves la logística?","options":[
-        {"title":"Contratar transporte de emergencia","desc":"Es caro, pero sostienes un nivel alto de operación.","concept":"OPEX logístico","payload":(2500000,0,800000,0,0),"result":"Pagaste una solución rápida. Protegiste entregas, aunque elevaste el gasto operativo del periodo."},
-        {"title":"Reorganizar rutas con recursos propios","desc":"Mantienes actividad media sin gasto extraordinario fuerte.","concept":"Eficiencia operativa","payload":(2000000,0,300000,0,0),"result":"Reorganizaste la distribución. Tuviste un costo moderado y evitaste una respuesta de emergencia más cara."},
-        {"title":"Aceptar retrasos y ahorrar","desc":"Gastas poco, pero reduces actividad comercial.","concept":"Costo de oportunidad","payload":(1000000,0,0,0,0),"result":"Preferiste ahorrar. La empresa conservó caja, pero trabajó con menor intensidad durante el problema logístico."},]},
-    11: {"emoji":"🏗️","title":"Proyecto de infraestructura","tag":"EXPANSIÓN","bg":"linear-gradient(135deg,#0f766e 0%,#059669 48%,#ca8a04 100%)","colors":("#0f766e","#ca8a04"),"scenario":"Surge un proyecto para mejorar infraestructura. Puedes pagarlo, financiarlo o rechazarlo.","question":"¿Cómo manejas el proyecto?","options":[
-        {"title":"Invertir con recursos propios","desc":"Usas efectivo y aumentas activos.","concept":"CAPEX","payload":(1500000,3500000,0,0,0),"result":"Financiaste la infraestructura con caja propia. Disminuyó efectivo, pero aumentó el patrimonio operativo de la empresa."},
-        {"title":"Co-invertir con financiamiento","desc":"Haces la inversión y tomas deuda para no vaciar la caja.","concept":"CAPEX + financiamiento","payload":(1800000,3500000,0,0,2500000),"result":"Realizaste el proyecto con apoyo financiero. Conservaste más caja, pero elevaste la deuda."},
-        {"title":"Rechazar el proyecto","desc":"No aumentas activos y mantienes recursos líquidos.","concept":"Liquidez vs crecimiento","payload":(2300000,0,0,0,0),"result":"No construiste infraestructura nueva. La empresa quedó más líquida, pero sin ese crecimiento de capacidad."},]},
-    12: {"emoji":"💰","title":"¿Qué hacemos con el dinero?","tag":"UTILIDADES","bg":"linear-gradient(135deg,#7c3aed 0%,#db2777 48%,#831843 100%)","colors":("#7c3aed","#db2777"),"scenario":"La empresa tiene que decidir qué priorizar: deuda, reinversión o conservar efectivo.","question":"¿Dónde colocas los recursos?","options":[
-        {"title":"Pagar deuda","desc":"Disminuyes obligaciones y futuros intereses.","concept":"Desapalancamiento","payload":(1500000,0,0,3000000,0),"result":"Reduciste deuda. Tu caja bajó, pero mejoraste la estructura financiera y los compromisos futuros."},
-        {"title":"Reinvertir en activos","desc":"Compras equipo y apuestas por capacidad futura.","concept":"CAPEX","payload":(1600000,3000000,0,0,0),"result":"Reinvertiste en activos. Sacrificaste liquidez inmediata para fortalecer la capacidad de largo plazo."},
-        {"title":"Guardar efectivo","desc":"No haces inversión ni pago extraordinario.","concept":"Reserva de liquidez","payload":(1000000,0,0,0,0),"result":"Guardaste efectivo. La empresa quedó con mayor colchón de caja, aunque sin reducir deuda ni ampliar activos."},]},
-    13: {"emoji":"🔍","title":"Auditoría de inventarios","tag":"CONTROL INTERNO","bg":"linear-gradient(135deg,#475569 0%,#0891b2 48%,#0e7490 100%)","colors":("#475569","#0891b2"),"scenario":"Hay diferencias entre registros e inventario físico. Una revisión puede costar dinero, pero ayuda a detectar fugas y pérdidas.","question":"¿Qué tan profunda será la auditoría?","options":[
-        {"title":"Auditoría completa","desc":"Revisas inventarios y controles con profundidad.","concept":"Control interno","payload":(1200000,0,2000000,0,0),"result":"Aplicaste una auditoría completa. Gastaste más, pero acumulaste una defensa mayor frente a diferencias y pérdidas."},
-        {"title":"Revisión dirigida a áreas críticas","desc":"Gasto moderado y enfoque selectivo.","concept":"Control basado en riesgo","payload":(1800000,0,800000,0,0),"result":"Hiciste una revisión focalizada. Equilibraste continuidad operativa y gasto de control."},
-        {"title":"No auditar por ahora","desc":"Mantienes producción y ahorras el costo de revisión.","concept":"Riesgo de control","payload":(2200000,0,0,0,0),"result":"Pospusiste la auditoría. Ahorraste recursos hoy, pero quedaste con menor protección ante diferencias de inventario."},]},
-    14: {"emoji":"🤝","title":"Contrato extraordinario","tag":"OPORTUNIDAD","bg":"linear-gradient(135deg,#2563eb 0%,#10b981 52%,#047857 100%)","colors":("#2563eb","#10b981"),"scenario":"Llega un contrato grande de suministro. Puede impulsar ingresos, pero exige capacidad y efectivo para cumplir.","question":"¿Aceptas el contrato?","options":[
-        {"title":"Aceptar el contrato completo","desc":"Operas casi al máximo para capturar la oportunidad.","concept":"Ventas y capital de trabajo","payload":(5500000,0,0,0,1500000),"result":"Aceptaste el contrato completo. Apostaste por un fuerte crecimiento de ventas y usaste apoyo financiero para sostenerlo."},
-        {"title":"Aceptar solo una parte","desc":"Capturas parte del negocio con menor presión financiera.","concept":"Crecimiento moderado","payload":(3500000,0,0,0,0),"result":"Aceptaste parcialmente. Generaste actividad adicional sin llevar la operación al nivel máximo."},
-        {"title":"Rechazar el contrato","desc":"Proteges liquidez y capacidad operativa.","concept":"Riesgo y liquidez","payload":(1400000,0,0,0,0),"result":"Rechazaste el contrato. La empresa evitó presión operativa, pero dejó pasar una oportunidad importante de ingresos."},]},
-    15: {"emoji":"🏁","title":"Cierre del reto","tag":"ESTRATEGIA FINAL","bg":"linear-gradient(135deg,#16a34a 0%,#eab308 50%,#b45309 100%)","colors":("#16a34a","#eab308"),"scenario":"Es la última decisión. Ya no basta con vender: importa cómo terminas en efectivo, deuda, activos y control de riesgos.","question":"¿Cuál será tu estrategia final?","options":[
-        {"title":"Cerrar con ventas agresivas","desc":"Maximizas operación y buscas utilidad final.","concept":"Rentabilidad","payload":(5800000,0,0,0,0),"result":"Cerraste de forma agresiva. Priorizaste actividad y ventas por encima de reducir deuda o reforzar controles."},
-        {"title":"Cerrar de forma equilibrada","desc":"Operas fuerte, pagas parte de deuda y refuerzas control.","concept":"Balance financiero","payload":(3800000,0,500000,1500000,0),"result":"Elegiste equilibrio: combinaste ventas, reducción de deuda y prevención antes del cierre."},
-        {"title":"Limpiar el balance","desc":"Operas menos y concentras recursos en bajar deuda.","concept":"Solvencia","payload":(2000000,0,0,3000000,0),"result":"Priorizaste sanear la deuda. Sacrificaste parte de la actividad final para cerrar con menos obligaciones."},]},
-}
-
-DEFAULT_THEME = {"emoji":"🛢️","title":"GRIY · Reto Petrolero","tag":"FINANZAS 360","bg":"linear-gradient(135deg,#0f766e 0%,#2563eb 48%,#7c3aed 100%)","colors":("#0f766e","#2563eb")}
-
-BASE_CSS = """
+CSS = """
 <style>
-.block-container {padding-top:1.15rem;max-width:1180px}
-.stApp {color:#fff}.stApp,.stApp p,.stApp label,.stApp h1,.stApp h2,.stApp h3,.stApp h4{color:#fff!important}
-section[data-testid="stSidebar"]{background:rgba(5,15,25,.90)!important;border-right:1px solid rgba(255,255,255,.16)}section[data-testid="stSidebar"] *{color:#fff!important}
-.hero{position:relative;overflow:hidden;border-radius:28px;padding:26px 30px;margin-bottom:18px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.28);box-shadow:0 18px 45px rgba(0,0,0,.18);backdrop-filter:blur(14px)}
-.hero-grid{display:grid;grid-template-columns:1fr auto;gap:18px;align-items:center}.griy-logo{display:inline-flex;width:78px;height:78px;border-radius:22px;background:#fff;color:#117a4b!important;align-items:center;justify-content:center;font-weight:950;font-size:23px;letter-spacing:1px;box-shadow:0 12px 35px rgba(0,0,0,.18)}
-.hero-title{font-size:38px;font-weight:950;line-height:1.04;margin:12px 0 5px}.hero-sub{font-size:15px;color:#eff6ff!important}.hero-emoji{font-size:88px;filter:drop-shadow(0 12px 16px rgba(0,0,0,.18))}.badge{display:inline-block;padding:7px 12px;margin:3px 6px 3px 0;border-radius:999px;background:rgba(0,0,0,.20);border:1px solid rgba(255,255,255,.28);font-weight:800;font-size:12px;letter-spacing:.05em}
-.glass{background:rgba(8,18,28,.68);border:1px solid rgba(255,255,255,.22);border-radius:22px;padding:20px;margin:12px 0;box-shadow:0 12px 28px rgba(0,0,0,.12);backdrop-filter:blur(10px)}
-.question{background:rgba(255,255,255,.95);color:#102030!important;border-radius:24px;padding:20px;margin:14px 0;box-shadow:0 16px 38px rgba(0,0,0,.16)}.question *{color:#102030!important}.question .tag{display:inline-block;background:#0f766e;color:white!important;padding:6px 10px;border-radius:999px;font-weight:900;font-size:12px}.question h2{margin:10px 0 8px}.scenario{font-size:17px;line-height:1.5}.ask{font-size:20px;font-weight:900;margin-top:16px}
-.q-grid{display:grid;grid-template-columns:minmax(280px,42%) 1fr;gap:20px;align-items:center}.q-art{border-radius:20px;overflow:hidden;box-shadow:0 12px 28px rgba(0,0,0,.18);min-height:245px}.q-art svg{display:block;width:100%;height:100%;min-height:245px}.q-copy{padding:4px 2px}
-.option-card{min-height:176px;background:rgba(255,255,255,.94);border-radius:20px;padding:17px;border:2px solid rgba(255,255,255,.5);box-shadow:0 12px 24px rgba(0,0,0,.12);margin-bottom:8px}.option-card *{color:#172033!important}.option-letter{font-size:13px;font-weight:950;color:#0f766e!important;letter-spacing:.08em}.option-title{font-size:19px;font-weight:950;margin:7px 0}.option-desc{font-size:14px;line-height:1.4;color:#44515f!important}.concept{font-size:12px;margin-top:12px;color:#0f766e!important;font-weight:900}
-div[data-testid="stMetric"]{background:rgba(6,18,28,.74);border:1px solid rgba(255,255,255,.20);padding:12px;border-radius:18px;backdrop-filter:blur(8px)}div[data-testid="stMetric"] *{color:#fff!important}.stButton>button{border-radius:14px;font-weight:900;min-height:46px}.stProgress>div>div>div>div{background-color:#fde047!important}
-.result{background:rgba(236,253,245,.96);border-left:7px solid #16a34a;border-radius:18px;padding:16px 18px;margin:12px 0}.result *{color:#123524!important}.podium{background:rgba(255,255,255,.94);border-radius:22px;padding:18px;text-align:center;min-height:170px}.podium *{color:#172033!important}
-@media(max-width:800px){.hero-title{font-size:29px}.hero-emoji{font-size:60px}.hero{padding:19px}.hero-grid{grid-template-columns:1fr auto}.griy-logo{width:62px;height:62px;font-size:19px}.option-card{min-height:auto}.q-grid{grid-template-columns:1fr}.q-art{min-height:190px}.q-art svg{min-height:190px}}
+@import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&display=swap');
+html,body,[class*='css'],.stApp{font-family:'Baloo 2',system-ui,sans-serif}.block-container{max-width:1180px;padding-top:1rem}.stApp{color:#fff}.stApp h1,.stApp h2,.stApp h3,.stApp p,.stApp label{color:#fff!important}
+section[data-testid='stSidebar']{background:rgba(34,32,64,.94)!important;border-right:4px solid rgba(255,255,255,.3)}section[data-testid='stSidebar'] *{color:#fff!important}
+.game-head{background:rgba(255,255,255,.22);border:3px solid rgba(255,255,255,.45);border-radius:30px;padding:18px 22px;box-shadow:0 10px 0 rgba(0,0,0,.13),0 18px 40px rgba(0,0,0,.12);backdrop-filter:blur(10px);margin-bottom:14px}.brand{font-size:42px;font-weight:800;text-shadow:0 4px 0 rgba(0,0,0,.15)}.sub{font-size:17px;font-weight:700}.mascot{font-size:72px;animation:bounce 1.8s infinite}.bubble{background:white;color:#2b2d42!important;border-radius:20px;padding:12px 16px;font-weight:800;display:inline-block;box-shadow:0 7px 0 rgba(0,0,0,.12)}
+@keyframes bounce{0%,100%{transform:translateY(0) rotate(-3deg)}50%{transform:translateY(-10px) rotate(3deg)}}@keyframes wiggle{0%,100%{transform:rotate(-1deg)}50%{transform:rotate(1deg)}}
+.mission{background:#fff;color:#25324a!important;border-radius:28px;padding:22px;border:5px solid rgba(255,255,255,.7);box-shadow:0 12px 0 rgba(0,0,0,.13),0 22px 44px rgba(0,0,0,.14);margin:12px 0}.mission *{color:#25324a!important}.mission-title{font-size:34px;font-weight:800}.mission-scene{font-size:20px;line-height:1.35}.mission-ask{font-size:25px;font-weight:800;margin-top:13px}.tip{background:#fff3bf;border:3px dashed #ffb703;padding:10px 14px;border-radius:18px;font-weight:700;margin-top:12px}.mission-emoji{font-size:105px;text-align:center;animation:wiggle 2s infinite}
+.choice{background:#fff;border-radius:24px;padding:16px;min-height:158px;box-shadow:0 9px 0 rgba(0,0,0,.12);border:4px solid #fff;margin-bottom:8px}.choice *{color:#25324a!important}.choice-title{font-size:21px;font-weight:800}.choice-desc{font-size:15px;color:#52606d!important}.stButton>button{font-family:'Baloo 2',sans-serif;font-weight:800;border-radius:18px;min-height:52px;font-size:17px;box-shadow:0 5px 0 rgba(0,0,0,.16);border:0}.stButton>button:hover{transform:translateY(-2px)}
+div[data-testid='stMetric']{background:rgba(255,255,255,.92);border-radius:20px;padding:10px;border:4px solid rgba(255,255,255,.45);box-shadow:0 7px 0 rgba(0,0,0,.1)}div[data-testid='stMetric'] *{color:#25324a!important}.result{background:#d8f3dc;color:#1b4332!important;border:4px solid #52b788;border-radius:22px;padding:16px;font-size:17px;font-weight:700}.result *{color:#1b4332!important}.waiting{background:#fff3bf;color:#6c4d00!important;padding:16px;border-radius:20px;border:3px dashed #ffb703}.stars{font-size:29px;letter-spacing:3px}.podium{background:white;border-radius:26px;padding:18px;text-align:center;box-shadow:0 9px 0 rgba(0,0,0,.12)}.podium *{color:#25324a!important}
+@media(max-width:800px){.brand{font-size:30px}.mascot{font-size:54px}.mission-title{font-size:27px}.mission-scene{font-size:17px}.mission-ask{font-size:21px}.mission-emoji{font-size:78px}.choice{min-height:auto}}
 </style>
 """
-st.markdown(BASE_CSS, unsafe_allow_html=True)
+st.markdown(CSS,unsafe_allow_html=True)
 
 
 def rpc(fn,payload):
     try:
         r=requests.post(f"{SUPABASE_URL}/rest/v1/rpc/{fn}",headers=HEADERS,json=payload,timeout=18)
         if r.ok:return None if not r.text else r.json()
-        try:
-            body=r.json();msg=body.get("message") or body.get("hint") or r.text
+        try:msg=r.json().get("message",r.text)
         except Exception:msg=r.text
         raise RuntimeError(msg)
-    except requests.RequestException as e:raise RuntimeError(f"No se pudo conectar con el servidor: {e}")
-
+    except requests.RequestException as e:raise RuntimeError(f"No se pudo conectar: {e}")
 
 def money(x):
-    x=float(x or 0)
-    return f"${x/1_000_000:,.2f} M" if abs(x)>=1_000_000 else f"${x:,.0f}"
-
-
-def fnum(x):
+    x=float(x or 0);return f"${x/1_000_000:,.1f} M" if abs(x)>=1_000_000 else f"${x:,.0f}"
+def num(x):
     try:return float(x or 0)
-    except Exception:return 0.0
+    except:return 0.0
 
+def stars(score):
+    n=max(1,min(5,int(num(score)/200)+1));return "⭐"*n+"☆"*(5-n)
 
-def inject_theme(round_no=0):
-    t=ROUNDS.get(int(round_no or 0),DEFAULT_THEME)
-    st.markdown(f"<style>.stApp{{background:{t['bg']} fixed!important;background-size:cover!important}}</style>",unsafe_allow_html=True)
-
+def theme(round_no=0):
+    bg=MISSIONS.get(round_no,{"bg":"linear-gradient(135deg,#ff6b6b,#4d96ff,#6bcb77)"})["bg"]
+    st.markdown(f"<style>.stApp{{background:{bg} fixed!important;background-size:cover!important}}</style>",unsafe_allow_html=True)
 
 def header(round_no=0):
-    t=ROUNDS.get(int(round_no or 0),DEFAULT_THEME)
-    st.markdown(f"""<div class='hero'><div class='hero-grid'><div><div style='display:flex;align-items:center;gap:14px'><div class='griy-logo'>GRIY</div><div><span class='badge'>RETO PETROLERO</span><span class='badge'>SIMULACIÓN ACADÉMICA</span></div></div><div class='hero-title'>{t['title'] if round_no else 'GRIY · Reto Petrolero'}</div><div class='hero-sub'>15 decisiones · finanzas · operación · riesgo · control</div></div><div class='hero-emoji'>{t['emoji']}</div></div></div>""",unsafe_allow_html=True)
+    title=MISSIONS.get(round_no,{}).get("title","GRIY · Aventura Petrolera")
+    st.markdown(f"""<div class='game-head'><div style='display:flex;justify-content:space-between;align-items:center;gap:15px'><div><div class='brand'>🎮 GRIY</div><div class='sub'>AVENTURA PETROLERA · 15 MISIONES</div><div class='bubble'>💬 GriBot: {('¡Resuelve la misión antes de que se acabe el tiempo!' if round_no else '¡Administra la empresa y llega al podio!')}</div></div><div class='mascot'>🤖</div></div></div>""",unsafe_allow_html=True)
 
-
-def visual_svg(round_no):
-    r=ROUNDS[round_no];c1,c2=r["colors"]
-    common=f"""<svg viewBox='0 0 640 360' xmlns='http://www.w3.org/2000/svg'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0%' stop-color='{c1}'/><stop offset='100%' stop-color='{c2}'/></linearGradient><filter id='s'><feDropShadow dx='0' dy='8' stdDeviation='8' flood-opacity='.22'/></filter></defs><rect width='640' height='360' rx='30' fill='url(#g)'/><circle cx='555' cy='60' r='95' fill='white' opacity='.08'/><circle cx='80' cy='330' r='130' fill='white' opacity='.06'/><g filter='url(#s)' stroke-linecap='round' stroke-linejoin='round'>"""
-    scenes={
-        1:"""<rect x='95' y='115' width='170' height='145' rx='16' fill='#fff' opacity='.95'/><rect x='120' y='85' width='36' height='80' rx='10' fill='#fde68a'/><rect x='175' y='70' width='42' height='95' rx='10' fill='#dbeafe'/><rect x='232' y='102' width='40' height='58' rx='10' fill='#bbf7d0'/><path d='M335 255h175v-95h-175z' fill='#0f172a' opacity='.78'/><path d='M370 160v-70h38v70M438 160v-105h38v105' stroke='#fff' stroke-width='14'/><path d='M330 255h190' stroke='#fff' stroke-width='12'/><circle cx='390' cy='218' r='26' fill='#facc15'/><circle cx='465' cy='218' r='26' fill='#22c55e'/>""",
-        2:"""<rect x='120' y='132' width='265' height='100' rx='48' fill='#e2e8f0'/><circle cx='195' cy='182' r='64' fill='#0f172a'/><circle cx='195' cy='182' r='25' fill='#93c5fd'/><rect x='370' y='150' width='115' height='64' rx='18' fill='#fff'/><path d='M90 182H55M525 182h60' stroke='#fff' stroke-width='18'/><path d='M175 90l-18-38M210 88l15-42M132 112l-33-28' stroke='#fde047' stroke-width='10'/><path d='M430 90l25-28M455 105l42-10' stroke='#fca5a5' stroke-width='9'/>""",
-        3:"""<rect x='95' y='185' width='450' height='90' rx='18' fill='#0f172a' opacity='.75'/><rect x='135' y='128' width='130' height='82' rx='18' fill='#fff'/><circle cx='198' cy='169' r='29' fill='#c4b5fd'/><rect x='330' y='105' width='150' height='110' rx='20' fill='#f8fafc'/><circle cx='405' cy='160' r='38' fill='none' stroke='#7c3aed' stroke-width='15'/><path d='M405 103v18M405 199v18M348 160h18M444 160h18' stroke='#7c3aed' stroke-width='12'/><path d='M118 274v35M515 274v35' stroke='#fff' stroke-width='14'/>""",
-        4:"""<rect x='80' y='90' width='220' height='185' rx='18' fill='#fff' opacity='.94'/><path d='M112 235l42-55 44 28 58-82' stroke='#ef4444' stroke-width='14' fill='none'/><path d='M240 125h30v30' stroke='#ef4444' stroke-width='12'/><rect x='365' y='180' width='135' height='90' rx='12' fill='#fed7aa'/><rect x='400' y='145' width='135' height='90' rx='12' fill='#fdba74'/><text x='435' y='210' text-anchor='middle' font-size='44' font-weight='900' fill='#9a3412'>$</text>""",
-        5:"""<path d='M105 155l165-85 165 85z' fill='#fff'/><rect x='130' y='155' width='280' height='110' rx='8' fill='#e0f2fe'/><rect x='165' y='168' width='34' height='80' fill='#1d4ed8'/><rect x='250' y='168' width='34' height='80' fill='#1d4ed8'/><rect x='335' y='168' width='34' height='80' fill='#1d4ed8'/><path d='M95 270h360' stroke='#fff' stroke-width='16'/><circle cx='505' cy='145' r='58' fill='#22c55e'/><text x='505' y='162' text-anchor='middle' font-size='54' font-weight='900' fill='#fff'>$</text><path d='M460 230c58 0 82 32 82 65' stroke='#fde047' stroke-width='12' fill='none'/>""",
-        6:"""<circle cx='220' cy='150' r='58' fill='#fcd34d'/><path d='M160 148h120c-6-52-27-75-60-75s-54 23-60 75z' fill='#f59e0b'/><rect x='158' y='198' width='125' height='95' rx='28' fill='#fff'/><circle cx='430' cy='150' r='58' fill='#fde68a'/><path d='M370 148h120c-6-52-27-75-60-75s-54 23-60 75z' fill='#16a34a'/><rect x='368' y='198' width='125' height='95' rx='28' fill='#e0f2fe'/><rect x='302' y='102' width='46' height='160' rx='16' fill='#fff' opacity='.9'/><path d='M325 130v90M285 175h80' stroke='#14b8a6' stroke-width='12'/>""",
-        7:"""<path d='M100 250h430' stroke='#fff' stroke-width='14'/><rect x='120' y='155' width='110' height='95' fill='#cbd5e1'/><path d='M145 155v-70h28v70M188 155v-105h28v105' stroke='#fff' stroke-width='14'/><circle cx='355' cy='175' r='72' fill='#f59e0b'/><rect x='340' y='115' width='30' height='120' rx='10' fill='#fff'/><rect x='295' y='160' width='120' height='30' rx='10' fill='#fff'/><path d='M465 110l72 72M537 110l-72 72' stroke='#ef4444' stroke-width='18'/>""",
-        8:"""<path d='M70 190h500' stroke='#d1d5db' stroke-width='44'/><path d='M70 190h500' stroke='#64748b' stroke-width='12'/><path d='M325 168l-18 65 38-8-22 70' stroke='#fde047' stroke-width='13' fill='none'/><path d='M365 250c18 18 18 42 0 58M395 250c18 18 18 42 0 58' stroke='#60a5fa' stroke-width='12' fill='none'/><path d='M495 72l72 28v68c0 63-42 98-72 110-30-12-72-47-72-110v-68z' fill='#16a34a'/><path d='M462 168l23 24 47-58' stroke='#fff' stroke-width='15' fill='none'/>""",
-        9:"""<rect x='105' y='95' width='150' height='190' rx='22' fill='#fff'/><rect x='130' y='125' width='100' height='55' rx='10' fill='#0ea5e9'/><path d='M255 140h48c35 0 52 22 52 50v70' stroke='#fff' stroke-width='18' fill='none'/><circle cx='355' cy='270' r='22' fill='#0f172a'/><path d='M395 260l38-60 42 25 65-92' stroke='#fde047' stroke-width='14' fill='none'/><path d='M510 132h35v35' stroke='#fde047' stroke-width='12'/>""",
-        10:"""<rect x='105' y='145' width='300' height='105' rx='16' fill='#fff'/><rect x='355' y='175' width='125' height='75' rx='12' fill='#f8fafc'/><path d='M385 175l35-55h55l40 55' fill='#fde68a'/><circle cx='185' cy='270' r='40' fill='#1f2937'/><circle cx='185' cy='270' r='16' fill='#94a3b8'/><circle cx='420' cy='270' r='40' fill='#1f2937'/><circle cx='420' cy='270' r='16' fill='#94a3b8'/><path d='M80 125h120M58 95h90M460 105h110' stroke='#fff' stroke-width='12' opacity='.85'/>""",
-        11:"""<rect x='90' y='190' width='460' height='85' rx='16' fill='#0f172a' opacity='.72'/><rect x='135' y='120' width='105' height='155' rx='18' fill='#e2e8f0'/><ellipse cx='187' cy='120' rx='52' ry='18' fill='#fff'/><rect x='315' y='140' width='120' height='135' rx='18' fill='#f8fafc'/><path d='M470 75v200M470 75h100M540 75v70' stroke='#fff' stroke-width='13'/><path d='M540 145l-30 48h60z' fill='#facc15'/>""",
-        12:"""<circle cx='185' cy='185' r='78' fill='#fde047'/><circle cx='185' cy='185' r='58' fill='#facc15'/><text x='185' y='210' text-anchor='middle' font-size='70' font-weight='900' fill='#92400e'>$</text><rect x='345' y='110' width='150' height='170' rx='18' fill='#fff'/><path d='M375 145h90M375 180h70M375 215h100' stroke='#7c3aed' stroke-width='12'/><path d='M290 140l35 35-35 35' stroke='#fff' stroke-width='16' fill='none'/>""",
-        13:"""<rect x='145' y='70' width='235' height='230' rx='22' fill='#fff'/><rect x='205' y='55' width='115' height='38' rx='14' fill='#94a3b8'/><path d='M190 135h145M190 180h145M190 225h90' stroke='#0891b2' stroke-width='11'/><circle cx='430' cy='220' r='65' fill='none' stroke='#fde047' stroke-width='18'/><path d='M475 268l70 60' stroke='#fde047' stroke-width='22'/><path d='M410 220l20 20 40-55' stroke='#22c55e' stroke-width='14' fill='none'/>""",
-        14:"""<rect x='80' y='95' width='220' height='190' rx='18' fill='#fff'/><path d='M115 135h145M115 175h115M115 215h135' stroke='#2563eb' stroke-width='11'/><path d='M330 190c38-55 85-55 123 0 38-55 85-55 123 0' stroke='#fff' stroke-width='22' fill='none'/><circle cx='365' cy='182' r='30' fill='#fde68a'/><circle cx='540' cy='182' r='30' fill='#fde68a'/><path d='M400 230l55-40 55 40' stroke='#10b981' stroke-width='20' fill='none'/>""",
-        15:"""<path d='M105 265h430' stroke='#fff' stroke-width='14'/><rect x='130' y='175' width='125' height='90' fill='#d1fae5'/><path d='M150 175v-70h25v70M205 175v-110h25v110' stroke='#fff' stroke-width='13'/><path d='M365 80h120v45c0 60-30 98-60 115-30-17-60-55-60-115z' fill='#fde047'/><path d='M395 80V55h60v25' stroke='#fff' stroke-width='13'/><path d='M425 120l13 27 30 4-22 21 5 30-26-14-26 14 5-30-22-21 30-4z' fill='#f59e0b'/><path d='M300 255l42-46 42 46' stroke='#22c55e' stroke-width='16' fill='none'/>""",
-    }
-    return common+scenes.get(round_no,"")+"</g></svg>"
-
-
-def init_state():
-    defaults={"role":None,"room_code":"","admin_pin":"","player_token":"","player_name":"","last_result":"","last_result_round":0}
-    for k,v in defaults.items():st.session_state.setdefault(k,v)
-
-
-def logout():
-    for k in ["role","room_code","admin_pin","player_token","player_name","last_result","last_result_round"]:st.session_state[k]=None if k=="role" else (0 if k=="last_result_round" else "")
-    st.rerun()
-
+def timer(seconds_left,label="TIEMPO"):
+    s=max(0,int(seconds_left or 0))
+    components.html(f"""
+    <div style='font-family:Arial;text-align:center;background:white;border-radius:24px;padding:10px 14px;box-shadow:0 8px 0 rgba(0,0,0,.12);border:4px solid #ffd166'>
+      <div style='font-size:13px;font-weight:900;color:#555'>{label}</div>
+      <div id='n' style='font-size:42px;font-weight:900;color:#e63946'>{s}</div>
+      <div style='height:16px;background:#eee;border-radius:20px;overflow:hidden'><div id='bar' style='height:100%;width:{(s/25)*100:.1f}%;background:linear-gradient(90deg,#06d6a0,#ffd166,#ef476f);transition:width 1s linear'></div></div>
+    </div>
+    <script>
+      let x={s}; let n=document.getElementById('n'); let b=document.getElementById('bar');
+      let t=setInterval(()=>{{x=Math.max(0,x-1);n.innerText=x;b.style.width=(x/25*100)+'%';if(x<=5)n.style.color='#d90429';if(x===0){{clearInterval(t);n.innerText='⏰';}}}},1000);
+    </script>""",height=115)
 
 def sidebar(round_no=0):
     with st.sidebar:
-        st.markdown("## 🛢️ GRIY");st.write("**Reto Petrolero**")
-        if round_no:st.progress(min(1.0,round_no/15.0),text=f"Pregunta {round_no} de 15")
-        st.divider();st.markdown("**Traducción rápida**")
-        st.write("🏭 Máquina/infraestructura = **CAPEX**");st.write("🧰 Consumibles/mantenimiento = **OPEX**");st.write("💵 Efectivo = dinero disponible");st.write("💳 Deuda = obligaciones pendientes");st.write("🛡️ Prevención y control = protección ante riesgos")
-        if st.session_state.room_code:st.divider();st.caption("Código de sala");st.code(st.session_state.room_code)
-        if st.session_state.role and st.button("Salir / volver al inicio",use_container_width=True):logout()
+        st.markdown("# 🤖 GriBot")
+        st.write("Tu compañero de aventura")
+        if round_no:st.progress(round_no/15,text=f"Misión {round_no}/15")
+        st.divider();st.write("🏭 **CAPEX** = comprar cosas grandes que duran")
+        st.write("🧰 **OPEX** = gastos del día a día")
+        st.write("💵 **Efectivo** = dinero disponible")
+        st.write("💳 **Deuda** = dinero que debes")
+        if st.session_state.get("room_code"):st.code(st.session_state.room_code)
+        if st.session_state.get("role") and st.button("🚪 Salir",use_container_width=True):
+            for k in ["role","room_code","admin_pin","player_token","player_name","last_result","last_round"]:st.session_state[k]=None if k=="role" else ""
+            st.rerun()
 
+def mission_card(n):
+    m=MISSIONS[n]
+    c1,c2=st.columns([1,2])
+    with c1:st.markdown(f"<div class='mission'><div class='mission-emoji'>{m['emoji']}</div></div>",unsafe_allow_html=True)
+    with c2:st.markdown(f"<div class='mission'><div style='font-weight:800;color:{m['color']}!important'>MISIÓN {n} DE 15</div><div class='mission-title'>{m['title']}</div><div class='mission-scene'>{m['scene']}</div><div class='mission-ask'>{m['ask']}</div><div class='tip'>💡 GriBot explica: {m['tip']}</div></div>",unsafe_allow_html=True)
 
-def player_result_text(option,state):
-    return f"<b>{option['result']}</b><br><br>Concepto financiero: <b>{option['concept']}</b><br>Efectivo: <b>{money(state.get('cash'))}</b> · Ganancia acumulada: <b>{money(state.get('profit'))}</b> · Deuda: <b>{money(state.get('debt'))}</b> · Puntos: <b>{fnum(state.get('score')):.0f}</b>"
-
-
-def submit_option(round_no,option):
-    operations,capex,controls,debt_payment,financing=option["payload"]
-    new_state=rpc("griy_submit_decision",{"p_player_token":st.session_state.player_token,"p_operations":operations,"p_capex":capex,"p_controls":controls,"p_debt_payment":debt_payment,"p_financing":financing})
-    st.session_state.last_result=player_result_text(option,new_state);st.session_state.last_result_round=round_no;time.sleep(.35);st.rerun()
-
-
-def question_card(round_no):
-    r=ROUNDS[round_no]
-    art=visual_svg(round_no)
-    st.markdown(f"""<div class='question'><div class='q-grid'><div class='q-art'>{art}</div><div class='q-copy'><span class='tag'>PREGUNTA {round_no} DE 15 · {r['tag']}</span><h2>{r['emoji']} {r['title']}</h2><div class='scenario'>{r['scenario']}</div><div class='ask'>{r['question']}</div></div></div></div>""",unsafe_allow_html=True)
-
-
-def option_grid(round_no):
-    r=ROUNDS[round_no];cols=st.columns(3);letters=["A","B","C"]
-    for i,option in enumerate(r["options"]):
+def choose_grid(n,token):
+    m=MISSIONS[n];letters=["A","B","C"];cols=st.columns(3)
+    for i,(title,desc,payload) in enumerate(m["opts"]):
         with cols[i]:
-            st.markdown(f"<div class='option-card'><div class='option-letter'>OPCIÓN {letters[i]}</div><div class='option-title'>{option['title']}</div><div class='option-desc'>{option['desc']}</div><div class='concept'>{option['concept']}</div></div>",unsafe_allow_html=True)
-            if st.button(f"Elegir {letters[i]}",key=f"choice_{round_no}_{i}",use_container_width=True,type="primary" if i==1 else "secondary"):
-                try:submit_option(round_no,option)
+            st.markdown(f"<div class='choice'><div style='font-size:14px;font-weight:800;color:{m['color']}!important'>OPCIÓN {letters[i]}</div><div class='choice-title'>{title}</div><div class='choice-desc'>{desc}</div></div>",unsafe_allow_html=True)
+            if st.button(f"✨ Elegir {letters[i]}",key=f"opt{n}_{i}",use_container_width=True,type="primary" if i==1 else "secondary"):
+                o,c,ctrl,pay,fin=payload
+                try:
+                    ns=rpc("griy_submit_decision",{"p_player_token":token,"p_operations":o,"p_capex":c,"p_controls":ctrl,"p_debt_payment":pay,"p_financing":fin})
+                    st.session_state.last_result=f"{title}. Ahora tienes {money(ns['cash'])} en efectivo, {money(ns['debt'])} de deuda y {num(ns['score']):.0f} puntos."
+                    st.session_state.last_round=n
+                    st.rerun()
                 except Exception as e:st.error(str(e))
 
-
-init_state()
+for k,v in {"role":None,"room_code":"","admin_pin":"","player_token":"","player_name":"","last_result":"","last_round":0}.items():st.session_state.setdefault(k,v)
 
 if not st.session_state.role:
-    inject_theme(0);header(0);sidebar(0);st.markdown("## ¿Cómo quieres entrar?")
-    c1,c2=st.columns(2)
-    with c1:
-        st.markdown("<div class='glass'><h2>👤 Participante</h2><p>Recibe un código de sala, administra tu empresa y toma 15 decisiones.</p></div>",unsafe_allow_html=True)
-        if st.button("Entrar como participante",use_container_width=True,type="primary"):st.session_state.role="participante";st.rerun()
-    with c2:
-        st.markdown("<div class='glass'><h2>🧑‍🏫 Administrador</h2><p>Crea la sala, controla el avance, observa resultados y muestra el podio final.</p></div>",unsafe_allow_html=True)
-        if st.button("Entrar como administrador",use_container_width=True):st.session_state.role="administrador";st.rerun()
-    st.caption("Proyecto académico independiente. No es un sitio oficial ni está afiliado a Petróleos Mexicanos.");st.stop()
+    theme();header();sidebar();st.markdown("## 🎯 Elige tu modo")
+    a,b=st.columns(2)
+    with a:
+        st.markdown("<div class='mission'><div class='mission-emoji'>🧒</div><div class='mission-title'>Jugador</div><div class='mission-scene'>Entra con el código y completa las 15 misiones.</div></div>",unsafe_allow_html=True)
+        if st.button("🎮 JUGAR",use_container_width=True,type="primary"):st.session_state.role="participante";st.rerun()
+    with b:
+        st.markdown("<div class='mission'><div class='mission-emoji'>🧑‍🏫</div><div class='mission-title'>Administrador</div><div class='mission-scene'>Crea la sala, controla las misiones y mira el ranking.</div></div>",unsafe_allow_html=True)
+        if st.button("🕹️ CONTROLAR PARTIDA",use_container_width=True):st.session_state.role="administrador";st.rerun()
+    st.stop()
 
 if st.session_state.role=="participante":
     if not st.session_state.player_token:
-        inject_theme(0);header(0);sidebar(0);st.markdown("## Entrar al reto")
+        theme();header();sidebar()
         with st.form("join"):
-            code=st.text_input("Código de sala",placeholder="GRIY-1234").strip().upper();name=st.text_input("Tu nombre o apodo",max_chars=50).strip();ok=st.form_submit_button("Entrar a la empresa",type="primary",use_container_width=True)
-        if ok:
+            st.markdown("## 🚪 Entra a la aventura")
+            code=st.text_input("Código de sala",placeholder="GRIY-1234").strip().upper();name=st.text_input("Tu nombre o apodo").strip();go=st.form_submit_button("🚀 ENTRAR",type="primary",use_container_width=True)
+        if go:
             try:
-                data=rpc("griy_join_room",{"p_code":code,"p_name":name});st.session_state.player_token=data["player_token"];st.session_state.player_name=data["name"];st.session_state.room_code=data["room_code"];st.rerun()
+                d=rpc("griy_join_room",{"p_code":code,"p_name":name});st.session_state.player_token=d["player_token"];st.session_state.player_name=d["name"];st.session_state.room_code=d["room_code"];st.rerun()
             except Exception as e:st.error(str(e))
         st.stop()
     try:p=rpc("griy_player_state",{"p_player_token":st.session_state.player_token})
-    except Exception as e:inject_theme(0);header(0);sidebar(0);st.error(str(e));st.stop()
-    round_no=int(p.get("current_round") or 0);inject_theme(round_no);header(round_no);sidebar(round_no)
-    st.markdown(f"### 👷 {p['name']} · tu empresa");st.progress(min(1.0,round_no/15.0),text=f"Avance del reto: {round_no}/15")
-    a,b,c,d=st.columns(4);a.metric("💵 Efectivo",money(p["cash"]));b.metric("📈 Ganancia",money(p["profit"]));c.metric("💳 Deuda",money(p["debt"]));d.metric("⭐ Puntos",f"{fnum(p['score']):.0f}")
-    e,f,g,h=st.columns(4);e.metric("🏭 Activo fijo",money(p["fixed_assets"]));f.metric("🛡️ Prevención y control",money(p["control_investment"]));g.metric("🚨 Pérdidas ilícitas",money(p["illicit_losses"]));h.metric("🏆 Lugar",f"#{p['rank']}")
-    if st.session_state.last_result and st.session_state.last_result_round==round_no:st.markdown(f"<div class='result'>{st.session_state.last_result}</div>",unsafe_allow_html=True)
-    status=p["room_status"]
-    if status=="waiting":st.info("La sala está lista. Espera a que el administrador inicie el reto.");st.button("🔄 Revisar si ya empezó") and st.rerun();st.stop()
-    if status=="paused":st.warning("La partida está pausada por el administrador.");st.button("🔄 Revisar estado") and st.rerun();st.stop()
-    if status=="finished":
-        st.success("🏁 El reto terminó.")
-        if int(p["rank"] or 999)==1:st.balloons();st.markdown("# 🏆 ¡Ganaste el Reto GRIY!")
-        else:st.markdown(f"## Tu posición final: #{p['rank']}")
-        st.stop()
-    if p["submitted"]:st.info("✅ Tu decisión quedó registrada. Espera a que el administrador avance a la siguiente pregunta.");st.button("🔄 Actualizar estado") and st.rerun();st.stop()
-    if round_no not in ROUNDS:st.error("La pregunta actual no está configurada.");st.stop()
-    question_card(round_no);option_grid(round_no);st.caption("Cada opción produce una combinación diferente de operación, inversión, controles, deuda o financiamiento. No hay una respuesta universalmente correcta: depende de cómo llegaste a esta ronda.")
+    except Exception as e:theme();header();sidebar();st.error(str(e));st.stop()
+    n=int(p.get("current_round") or 0);theme(n);header(n);sidebar(n)
+    st.markdown(f"## 👋 ¡Hola, {p['name']}!")
+    x1,x2,x3,x4=st.columns(4);x1.metric("💵 Dinero",money(p['cash']));x2.metric("🏆 Puntos",f"{num(p['score']):.0f}");x3.metric("📍 Lugar",f"#{p['rank']}");x4.metric("💳 Deuda",money(p['debt']))
+    st.markdown(f"<div class='stars'>{stars(p['score'])}</div>",unsafe_allow_html=True)
+    if p['room_status']=='waiting':st.markdown("<div class='waiting'>⏳ GriBot dice: espera a que el administrador empiece.</div>",unsafe_allow_html=True);st.button("🔄 Revisar") and st.rerun();st.stop()
+    if p['room_status']=='paused':st.warning("⏸️ El juego está pausado.");st.stop()
+    if p['room_status']=='finished':
+        st.balloons();st.markdown(f"# 🏁 ¡Terminaste!\n## Quedaste en el lugar #{p['rank']}");st.stop()
+    if st.session_state.last_result and st.session_state.last_round==n:st.markdown(f"<div class='result'>🎉 {st.session_state.last_result}</div>",unsafe_allow_html=True)
+    if p['submitted']:st.success("✅ ¡Misión completada! Espera a la siguiente.");st.button("🔄 Actualizar") and st.rerun();st.stop()
+    mission_card(n)
+    if p.get('expired'):
+        st.error("⏰ ¡Se acabó el tiempo! Espera la siguiente misión.");st.stop()
+    timer(p.get('seconds_left',25),"⏱️ RESPONDE RÁPIDO")
+    choose_grid(n,st.session_state.player_token)
 
 if st.session_state.role=="administrador":
     if not st.session_state.room_code:
-        inject_theme(0);header(0);sidebar(0);st.markdown("## 🧑‍🏫 Panel del administrador");t1,t2=st.tabs(["Crear nueva partida","Abrir partida existente"])
-        with t1:
-            with st.form("create_room"):
-                title=st.text_input("Nombre de la actividad",value="GRIY · Reto Petrolero");pin=st.text_input("PIN del administrador",type="password",help="De 4 a 12 dígitos.");max_players=st.number_input("Máximo de alumnos",min_value=1,max_value=60,value=30,step=1);make=st.form_submit_button("Crear sala de 15 preguntas",type="primary",use_container_width=True)
-            if make:
-                try:
-                    data=rpc("griy_create_room",{"p_admin_pin":pin,"p_title":title,"p_max_players":int(max_players)});st.session_state.room_code=data["code"];st.session_state.admin_pin=pin;st.rerun()
+        theme();header();sidebar();a,b=st.tabs(["➕ Nueva partida","🔓 Abrir partida"])
+        with a:
+            with st.form("new"):
+                title=st.text_input("Nombre",value="GRIY · Aventura Petrolera");pin=st.text_input("PIN",type="password");mx=st.number_input("Jugadores",1,60,30);go=st.form_submit_button("🎉 CREAR PARTIDA",type="primary",use_container_width=True)
+            if go:
+                try:d=rpc("griy_create_room",{"p_admin_pin":pin,"p_title":title,"p_max_players":int(mx)});st.session_state.room_code=d['code'];st.session_state.admin_pin=pin;st.rerun()
                 except Exception as e:st.error(str(e))
-        with t2:
-            with st.form("open_room"):
-                code=st.text_input("Código",placeholder="GRIY-1234").strip().upper();pin2=st.text_input("PIN",type="password");open_it=st.form_submit_button("Abrir panel",use_container_width=True)
-            if open_it:
+        with b:
+            with st.form("open"):
+                code=st.text_input("Código").strip().upper();pin2=st.text_input("PIN",type="password");go2=st.form_submit_button("ABRIR")
+            if go2:
                 try:rpc("griy_admin_state",{"p_code":code,"p_pin":pin2});st.session_state.room_code=code;st.session_state.admin_pin=pin2;st.rerun()
                 except Exception as e:st.error(str(e))
         st.stop()
-    try:state=rpc("griy_admin_state",{"p_code":st.session_state.room_code,"p_pin":st.session_state.admin_pin});room=state["room"];agg=state["aggregate"];players=state["players"]
-    except Exception as e:inject_theme(0);header(0);sidebar(0);st.error(str(e));st.stop()
-    current=int(room.get("current_round") or 0);inject_theme(current);header(current);sidebar(current)
-    st.markdown(f"<div class='glass'><div style='font-size:13px'>CÓDIGO PARA EL GRUPO</div><div style='font-size:42px;font-weight:950'>{room['code']}</div><div>Comparte el mismo enlace de GRIY y este código.</div></div>",unsafe_allow_html=True)
-    if current in ROUNDS:question_card(current)
-    a,b,c,d=st.columns(4);a.metric("👥 Alumnos",f"{agg['player_count']} / {room['max_players']}");b.metric("✅ Ya respondieron",f"{agg['submitted']}");c.metric("⭐ Puntos promedio",f"{fnum(agg['avg_score']):.0f}");d.metric("📈 Ganancia promedio",money(agg["avg_profit"]))
-    c1,c2,c3,c4=st.columns(4)
-    with c1:
-        if room["status"]=="waiting" and st.button("▶️ Iniciar reto",use_container_width=True,type="primary"):
-            try:rpc("griy_admin_start",{"p_code":room["code"],"p_pin":st.session_state.admin_pin});st.rerun()
+    try:s=rpc("griy_admin_state",{"p_code":st.session_state.room_code,"p_pin":st.session_state.admin_pin});room=s['room'];agg=s['aggregate'];players=s['players']
+    except Exception as e:theme();header();sidebar();st.error(str(e));st.stop()
+    n=int(room.get('current_round') or 0);theme(n);header(n);sidebar(n)
+    st.markdown(f"<div class='game-head'><div style='font-size:18px;font-weight:800'>📣 CÓDIGO PARA ENTRAR</div><div style='font-size:48px;font-weight:800'>{room['code']}</div></div>",unsafe_allow_html=True)
+    if n in MISSIONS:mission_card(n);timer(room.get('seconds_left',25),"⏱️ TIEMPO DE LA MISIÓN")
+    a,b,c,d=st.columns(4);a.metric("👥 Jugadores",f"{agg['player_count']} / {room['max_players']}");b.metric("✅ Respondieron",agg['submitted']);c.metric("🏆 Puntos promedio",f"{num(agg['avg_score']):.0f}");d.metric("📈 Ganancia promedio",money(agg['avg_profit']))
+    q1,q2,q3,q4=st.columns(4)
+    with q1:
+        if room['status']=='waiting' and st.button("🚀 INICIAR",use_container_width=True,type="primary"):
+            try:rpc("griy_admin_start",{"p_code":room['code'],"p_pin":st.session_state.admin_pin});st.rerun()
             except Exception as e:st.error(str(e))
-    with c2:
-        if room["status"] in ["running","paused"]:
-            label="⏸️ Pausar" if room["status"]=="running" else "▶️ Reanudar"
+    with q2:
+        if room['status'] in ['running','paused']:
+            label="⏸️ PAUSAR" if room['status']=='running' else "▶️ REANUDAR"
             if st.button(label,use_container_width=True):
-                try:rpc("griy_admin_pause_toggle",{"p_code":room["code"],"p_pin":st.session_state.admin_pin});st.rerun()
+                try:rpc("griy_admin_pause_toggle",{"p_code":room['code'],"p_pin":st.session_state.admin_pin});st.rerun()
                 except Exception as e:st.error(str(e))
-    with c3:
-        if room["status"] in ["running","paused"] and st.button("⏭️ Siguiente pregunta",use_container_width=True):
-            try:rpc("griy_admin_advance",{"p_code":room["code"],"p_pin":st.session_state.admin_pin});st.rerun()
+    with q3:
+        if room['status'] in ['running','paused'] and st.button("⏭️ SIGUIENTE MISIÓN",use_container_width=True):
+            try:rpc("griy_admin_advance",{"p_code":room['code'],"p_pin":st.session_state.admin_pin});st.rerun()
             except Exception as e:st.error(str(e))
-    with c4:
-        if st.button("🔄 Actualizar",use_container_width=True):st.rerun()
-    if room["status"]=="waiting":st.info("Espera a que entren los alumnos y después inicia el reto. Las salas nuevas tienen 15 preguntas.")
-    elif room["status"]=="finished":st.success("🏁 El reto terminó. Ya puedes proyectar el podio final.")
-    st.markdown("### 📊 Seguimiento del grupo")
+    with q4:
+        if st.button("🔄 ACTUALIZAR",use_container_width=True):st.rerun()
     if players:
-        df=pd.DataFrame(players);keep=[c for c in ["name","score","profit","cash","liquidity","debt","submitted"] if c in df.columns];df=df[keep].rename(columns={"name":"Alumno","score":"Puntos","profit":"Ganancia","cash":"Efectivo","liquidity":"Liquidez","debt":"Deuda","submitted":"Ya respondió"})
-        for col in ["Puntos","Ganancia","Efectivo","Liquidez","Deuda"]:
-            if col in df.columns:df[col]=pd.to_numeric(df[col],errors="coerce")
+        df=pd.DataFrame(players);cols=[c for c in ['name','score','profit','cash','debt','submitted'] if c in df.columns];df=df[cols].rename(columns={'name':'Jugador','score':'Puntos','profit':'Ganancia','cash':'Dinero','debt':'Deuda','submitted':'Listo'})
         st.dataframe(df,use_container_width=True,hide_index=True)
-        if room["status"]=="finished" and "Puntos" in df.columns:
-            podium=df.sort_values(["Puntos","Ganancia"],ascending=[False,False]).head(3).reset_index(drop=True);st.markdown("## 🏆 Podio GRIY");medals=["🥇","🥈","🥉"];cols=st.columns(len(podium))
-            for i,row in podium.iterrows():
-                with cols[i]:st.markdown(f"<div class='podium'><div style='font-size:52px'>{medals[i]}</div><h3>{row['Alumno']}</h3><div style='font-size:27px;font-weight:950'>{row['Puntos']:.0f} pts</div><div>{money(row['Ganancia'])} de ganancia</div></div>",unsafe_allow_html=True)
-            st.balloons()
-    else:st.info("Todavía no entra ningún participante.")
-    st.caption("GRIY es una simulación académica independiente del sector petrolero mexicano. No es un sitio oficial ni está afiliado a Petróleos Mexicanos.")
+        if room['status']=='finished':
+            st.balloons();st.markdown("# 🏆 PODIO GRIY");pod=df.sort_values(['Puntos','Ganancia'],ascending=False).head(3).reset_index(drop=True);med=['🥇','🥈','🥉'];pc=st.columns(len(pod))
+            for i,row in pod.iterrows():
+                with pc[i]:st.markdown(f"<div class='podium'><div style='font-size:55px'>{med[i]}</div><h2>{row['Jugador']}</h2><div style='font-size:28px;font-weight:800'>{row['Puntos']:.0f} pts</div></div>",unsafe_allow_html=True)
+    else:st.info("Todavía no entra nadie.")
+
+st.caption("GRIY es una simulación académica independiente. No es un sitio oficial ni está afiliado a Petróleos Mexicanos.")
